@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { generateDispatchInvoice } from './components/invoice/dispatchInvoice'
+import FeedManagementPage from './components/FeedManagementPage'
 
 
 // ═══ API CLIENT ══════════════════════════════════════════════════════════════
- const BASE = 'http://localhost:8080'
+ const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 // const BASE = 'https://placed-graduate-amy-welding.trycloudflare.com'
 // const BASE = 'https://wise-observe-presentations-template.trycloudflare.com'
 async function req(path, opts = {}) {
@@ -2153,13 +2154,17 @@ const NAV = [
   { id:'dashboard',  label:'Dashboard',         icon:'🏡', group:'Overview' },
   { id:'fish-types', label:'Fish Types',  icon:'🐟', group:'Master Data' },
   { id:'ponds',      label:'Ponds',      icon:'🏊', group:'Master Data' },
+  { id:'daily-feed', label:'Daily Feed', icon:'🌾', group:'Actions Karo' },
   { id:'harvests',   label:'Harvest',    icon:'🎣', group:'Actions Karo' },
   { id:'inventory',  label:'Stock (Inventory)', icon:'📦', group:'Actions Karo' },
   { id:'dispatches', label:'Dispatch (Vehicle)',   icon:'🚛', group:'Actions Karo' },
   { id:'sales-history', label:'Sales History', icon:'💰', group:'Reports' },
 ]
 
+function DailyFeedPage() { return <FeedManagementPage request={req} /> }
+
 const PAGES = {
+  'daily-feed': DailyFeedPage,
   dashboard:   DashboardPage,
   'fish-types':FishTypesPage,
   ponds:       PondsPage,

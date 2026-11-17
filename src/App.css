@@ -548,3 +548,7 @@ textarea { resize: vertical; min-height: 70px; }
   .page { padding: 20px 16px 48px; }
   .form-grid-2, .info-grid { grid-template-columns: 1fr; }
 }
+.feed-fieldset { border: 0; margin: 0; padding: 22px; min-width: 0; }
+.feed-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.feed-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-top: 16px; }
+.feed-filters .form-group { flex: 1; min-width: 160px; }
