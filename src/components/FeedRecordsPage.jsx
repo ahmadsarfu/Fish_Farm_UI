@@ -1,6 +1,7 @@
+import { businessDate } from '../businessDate'
 import { useEffect, useState } from 'react'
 
-const today = () => new Date().toLocaleDateString('en-CA')
+const today = businessDate
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })
 const blankEntry = () => ({ pondId: '', feedTypeId: '', feedingDate: today(), feedingTime: 'MORNING', quantityKg: '', notes: '' })
 const blankMaster = () => ({ sizeMm: '1', name: '', ratePerKg: '', active: true })

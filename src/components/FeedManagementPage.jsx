@@ -1,11 +1,12 @@
+import { businessDate } from '../businessDate'
 import { useEffect, useState } from 'react'
 import FeedRecordsPage from './FeedRecordsPage'
 
-const today = () => new Date().toLocaleDateString('en-CA')
+const today = businessDate
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })
 const kg = value => Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })
 
-export default function FeedManagementPage({ request }) {
+export default function FeedManagementPage({ request, role = 'OWNER' }) {
   const [date, setDate] = useState(today)
   const [tab, setTab] = useState('checklist')
   const [dashboard, setDashboard] = useState(null)
@@ -84,7 +85,7 @@ export default function FeedManagementPage({ request }) {
     const pending = busy === `${row.pondId}-${time}`
     return <td className="feed-slot-cell">
       <label className={`feed-tick ${slot.completed ? 'is-done' : ''}`}>
-        <input type="checkbox" checked={slot.completed} disabled={!!busy || loading || !enabled || date > today()}
+        <input type="checkbox" checked={slot.completed} disabled={!!busy || loading || !enabled || date > today() || (role === 'LABOUR' && slot.completed)}
           aria-label={`${label} feeding for ${row.pondName}`} onChange={() => tick(row, time, slot)} />
         <span aria-hidden="true">{pending ? '…' : slot.completed ? '✓' : ''}</span>
       </label>
@@ -96,19 +97,19 @@ export default function FeedManagementPage({ request }) {
   return <div className="page feed-workspace">
     <div className="page-hdr"><div><h1 className="page-title">Daily Feed Management</h1><p className="page-desc">Feed daalo, AM / PM tick karo. Kharcha apne aap save hoga.</p></div>
       {tab !== 'records' && <button className="btn btn-ghost" disabled={!!busy || loading} onClick={refresh}>Refresh</button>}</div>
-    <div className="tabs feed-tabs">{[['checklist', 'Daily Checklist'], ['setup', 'Pond Feed Setup'], ['records', 'Feed Master & Records']].map(([value, label]) => <button key={value} className={`tab-btn ${tab === value ? 'active' : ''}`} disabled={!!busy} onClick={() => switchTab(value)}>{label}</button>)}</div>
+    <div className="tabs feed-tabs">{(role === 'LABOUR' ? [['checklist', 'Daily Checklist']] : [['checklist', 'Daily Checklist'], ['setup', 'Pond Feed Setup'], ['records', 'Feed Master & Records']]).map(([value, label]) => <button key={value} className={`tab-btn ${tab === value ? 'active' : ''}`} disabled={!!busy} onClick={() => switchTab(value)}>{label}</button>)}</div>
     {error && <div role="alert" className="alert alert-error">{error}</div>}
     {message && <div role="status" className="alert alert-success">{message}</div>}
     {tab === 'records' ? <FeedRecordsPage request={request} embedded /> : <>
-      <div className="feed-date-row"><label className="form-group">Feeding Date<input type="date" required max={today()} value={date} disabled={!!busy} onChange={event => { if (event.target.value) { setDate(event.target.value); setLoading(true); setMessage('') } }} /></label><p className="page-desc">{tab === 'setup' ? 'Set quantities once. Labour only needs to tick AM / PM.' : 'Tick only after feeding is complete. Saved ticks remain after refresh.'}</p></div>
+      <div className="feed-date-row"><label className="form-group">Feeding Date<input type="date" required max={today()} value={date} disabled={!!busy || role === 'LABOUR'} onChange={event => { if (event.target.value) { setDate(event.target.value); setLoading(true); setMessage('') } }} /></label><p className="page-desc">{tab === 'setup' ? 'Set quantities once. Labour only needs to tick AM / PM.' : 'Tick only after feeding is complete. Saved ticks remain after refresh.'}</p></div>
       {loading ? <div role="status" className="loading">Loading ponds…</div> : dashboard?.date === date && <>
         {tab === 'checklist' ? <>
           <div className="stats-grid feed-checklist-stats"><div className="stat-card stat-green"><div className="stat-lbl">Feedings Completed</div><div className="stat-val">{completed}<span className="feed-stat-denominator">/{planned}</span></div><div className="stat-unit">AM / PM slots planned</div></div><div className="stat-card stat-amber"><div className="stat-lbl">Daily Feed Cost</div><div className="stat-val">{money(dashboard.totalExpense)}</div><div className="stat-unit">For completed feeding only</div></div></div>
-          {!!missing && <div className="alert alert-info">{missing} pond(s) need feed setup. <button className="btn btn-ghost btn-sm" onClick={() => switchTab('setup')}>Set up ponds</button></div>}
+          {!!missing && <div className="alert alert-info">{missing} pond(s) need feed setup. {role !== 'LABOUR' ? <button className="btn btn-ghost btn-sm" onClick={() => switchTab('setup')}>Set up ponds</button> : 'Ask your manager to set up these ponds.'}</div>}
           <div className="card"><div className="table-wrap"><table className="feed-checklist"><thead><tr><th>Pond</th><th>Feed</th><th>Kg / AM · PM</th><th>AM</th><th>PM</th></tr></thead><tbody>{rows.map(row => <tr key={row.pondId}><td><strong>{row.pondName}</strong><div className="feed-slot-note">{row.pondNumber}{!row.active && ' · Inactive'}</div></td><td>{row.config ? <>{row.config.sizeMm} mm<div className="feed-slot-note">{row.config.feedName} · {money(row.config.ratePerKg)}/kg</div></> : 'Not configured'}</td><td>{row.config ? `${kg(row.config.morningQtyKg)} / ${kg(row.config.eveningQtyKg)}` : '—'}</td>{slotCell(row, 'MORNING', row.morning)}{slotCell(row, 'EVENING', row.evening)}</tr>)}</tbody></table></div>
-            {!rows.length && <p className="empty">No active ponds. Add a pond in Ponds to begin.</p>}
+            {!rows.length && <p className="empty">{role === 'LABOUR' ? 'No ponds assigned. Ask your manager.' : 'No active ponds. Add a pond in Ponds to begin.'}</p>}
             <div className="feed-progress"><div><strong>Total Feeding Expense</strong><strong>{money(dashboard.totalExpense)}</strong></div><div className="page-desc">Completed slots: {completed} of {planned}</div><progress aria-label="Completed feeding slots" max={planned || 1} value={completed} /></div>
-          </div><p className="page-desc">Completed ticks keep their saved feed, quantity and rate. To correct a mistaken tick, untick it and confirm.</p>
+          </div><p className="page-desc">Completed ticks keep their saved feed, quantity and rate. {role === 'LABOUR' ? 'Ask your manager to correct a mistaken tick.' : 'To correct a mistaken tick, untick it and confirm.'}</p>
         </> : <>
           <div className="alert alert-info">Choose feed size and AM / PM quantities for each pond. Use 0 for a time with no planned feeding. Set actual prices in Feed Master.</div>
           {rows.filter(row => row.active).map(row => { const values = draft(row); return <form className="card feed-setup-card" key={row.pondId} onSubmit={event => saveSetup(event, row)}><div><h2 className="card-title">{row.pondName}</h2><p className="card-sub">{row.pondNumber}</p></div><fieldset disabled={!!busy} className="feed-setup-fields"><label className="form-group">Feed for {row.pondName}<select aria-label={`Feed for ${row.pondName}`} required value={values.feedTypeId} onChange={event => update(row, 'feedTypeId', event.target.value)}><option value="">Select feed</option>{types.filter(type => type.active || type.id === Number(values.feedTypeId)).map(type => <option key={type.id} value={type.id}>{type.sizeMm} mm — {type.name}{!type.active ? ' (inactive)' : ''}</option>)}</select></label><label className="form-group">AM kg for {row.pondName}<input type="number" min="0" max="9999999.999" step="0.001" required value={values.morningQtyKg} onChange={event => update(row, 'morningQtyKg', event.target.value)} /></label><label className="form-group">PM kg for {row.pondName}<input type="number" min="0" max="9999999.999" step="0.001" required value={values.eveningQtyKg} onChange={event => update(row, 'eveningQtyKg', event.target.value)} /></label><button className="btn btn-primary" type="submit">{busy === `setup-${row.pondId}` ? 'Saving…' : `Save ${row.pondName}`}</button></fieldset></form> })}

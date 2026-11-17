@@ -1,40 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { generateDispatchInvoice } from './components/invoice/dispatchInvoice'
 import FeedManagementPage from './components/FeedManagementPage'
+import TeamPage from './components/TeamPage'
+import AccountPage from './components/AccountPage'
+import BatchesPage from './components/BatchesPage'
+import AuthProvider from './auth/AuthProvider'
+import LoginPage from './auth/LoginPage'
+import { useAuth } from './auth/context'
+import { request as req } from './api'
+import { businessDate, businessTimeZone } from './businessDate'
 
-
-// ═══ API CLIENT ══════════════════════════════════════════════════════════════
- const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-// const BASE = 'https://placed-graduate-amy-welding.trycloudflare.com'
-// const BASE = 'https://string-limitations-forms-tell.trycloudflare.com'
-async function req(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
-    ...opts,
-  })
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}))
-    throw new Error(e.message || e.error || `HTTP ${res.status}`)
-  }
-  if (res.status === 204) return null
-  return res.json()
-}
 
 // ═══ DATE HELPERS ═════════════════════════════════════════════════════════════
-const getLocalDate = (date = new Date()) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-const getLocalMonth = (date = new Date()) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-
-  return `${year}-${month}`
-}
+const getLocalDate = businessDate
+const getLocalMonth = (date = new Date()) => businessDate(date).slice(0, 7)
 
 const fishApi = {
   getAll:  ()      => req('/api/fish-types'),
@@ -3777,7 +3756,7 @@ function DashboardPage({ onNav }) {
       <div className="page-hdr">
         <div>
           <div className="page-title">🏡 Dashboard</div>
-          <div className="page-desc">{new Date().toLocaleDateString('hi-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</div>
+          <div className="page-desc">{new Date().toLocaleDateString('hi-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:businessTimeZone()})}</div>
         </div>
       </div>
 
@@ -3922,11 +3901,17 @@ const NAV = [
   id:'inventory',label:'Fish Stock',icon:'📦',group:'Actions Karo'},
   { id:'dispatches', label:'Dispatch (Vehicle)',   icon:'🚛', group:'Actions Karo' },
   { id:'sales-history', label:'Sales History', icon:'💰', group:'Reports' },
+  { id:'batches', label:'Batches & Costing', icon:'🐠', group:'Reports' },
+  { id:'team', label:'Team & Settings', icon:'⚙️', group:'Administration' },
+  { id:'account', label:'My Account', icon:'👤', group:'Administration' },
 ]
 
-function DailyFeedPage() { return <FeedManagementPage request={req} /> }
+function DailyFeedPage() { const { user } = useAuth(); return <FeedManagementPage request={req} role={user.role} /> }
 
 const PAGES = {
+  batches: BatchesPage,
+  team: TeamPage,
+  account: AccountPage,
   'daily-feed': DailyFeedPage,
   dashboard:   DashboardPage,
   'fish-types':FishTypesPage,
@@ -3939,15 +3924,18 @@ const PAGES = {
 }
 
 // ═══ APP ROOT ══════════════════════════════════════════════════════════════════
-export default function App() {
-  const [active, setActive] = useState('dashboard')
+function FarmApp({ user }) {
+  const { logout, selectFarm } = useAuth()
+  const [sessionError, setSessionError] = useState('')
+  const visibleNav = user.role === 'LABOUR' ? NAV.filter(item => ['daily-feed', 'account'].includes(item.id)) : NAV.filter(item => item.id !== 'team' || user.role === 'OWNER')
+  const [active, setActive] = useState(user.role === 'LABOUR' ? 'daily-feed' : 'dashboard')
   const [dispatchCustomer, setDispatchCustomer] = useState(null)
   const startCustomerDispatch = customer => {
   setDispatchCustomer(customer)
   setActive('dispatches')
 }
   const Page = PAGES[active] || DashboardPage
-  const groups = [...new Set(NAV.map(n => n.group))]
+  const groups = [...new Set(visibleNav.map(n => n.group))]
   const activeNav = NAV.find(n => n.id === active)
 
   return (
@@ -3963,7 +3951,7 @@ export default function App() {
           {groups.map(g => (
             <div key={g}>
               <div className="nav-section">{g}</div>
-              {NAV.filter(n => n.group === g).map(n => (
+              {visibleNav.filter(n => n.group === g).map(n => (
                 <div key={n.id}
                   className={`nav-item ${active === n.id ? 'active' : ''}`}
                   onClick={() => setActive(n.id)}>
@@ -3976,8 +3964,8 @@ export default function App() {
         </nav>
 
         <div className="sidebar-farm-info">
-          <div className="farm-info-label">Farm Size</div>
-          <div className="farm-info-val">2 Acres</div>
+          <div className="farm-info-label">Current farm</div>
+          <div className="farm-info-val">{user.farms.find(farm => farm.id === user.farmId)?.name}</div>
         </div>
 
         <div className="sidebar-bottom">
@@ -3988,12 +3976,16 @@ export default function App() {
       <div className="main">
         <div className="topbar">
           <div className="topbar-page-name">{activeNav?.icon} {activeNav?.label}</div>
-          <div className="topbar-right">
+          <div className="topbar-right session-controls">
+            <span>{user.displayName} · {user.role}</span>
+            {user.farms.length > 1 && <select aria-label="Current farm" value={user.farmId} onChange={async event => { try { await selectFarm(event.target.value) } catch (error) { setSessionError(error.message) } }}>{user.farms.map(farm => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select>}
+            <button className="btn btn-ghost btn-sm" onClick={async () => { try { await logout() } catch (error) { setSessionError(error.message) } }}>Log out</button>
             <div className="topbar-date">
-              {new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+              {new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric', timeZone:user.timeZone })}
             </div>
           </div>
         </div>
+        {sessionError && <div role="alert" className="alert alert-error">{sessionError}</div>}
         <Page
   onNav={setActive}
   onCustomerDispatch={startCustomerDispatch}
@@ -4004,3 +3996,10 @@ export default function App() {
     </div>
   )
 }
+function AuthenticatedApp() {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="loading">Loading your farm…</div>
+  if (!user) return <LoginPage />
+  return <FarmApp key={`${user.id}-${user.farmId}`} user={user} />
+}
+export default function App() { return <AuthProvider><AuthenticatedApp /></AuthProvider> }

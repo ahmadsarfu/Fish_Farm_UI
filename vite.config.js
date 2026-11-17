@@ -29,19 +29,14 @@ export default defineConfig({
         ]
       },
       workbox: {
-        runtimeCaching: [
-          {
-            // urlPattern: /^http:\/\/localhost:8080\/.*/,
-            // urlPattern: /^http:\/\/192\.168\.1\.8:8080\/.*/,
-            // urlPattern: /^http:\/\/10\.10\.5\.197:8080\/.*/,
-            urlPattern: /^https:\/\/placed-graduate-amy-welding\.trycloudflare\.com\/.*/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 } // 1 day
-            }
-          }
-        ]
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        importScripts: ['clear-api-cache.js'],
+        runtimeCaching: [{
+          urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+          handler: 'NetworkOnly'
+        }]
       }
     })
   ],
