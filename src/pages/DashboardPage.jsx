@@ -1,3 +1,5 @@
+import FarmGettingStarted from '../components/FarmGettingStarted'
+import { useAuth } from '../auth/context'
 import { useNavigate } from 'react-router-dom'
 import { fishApi } from '../api/fishTypeApi'
 import { pondApi } from '../api/pondApi'
@@ -10,6 +12,7 @@ import { getLocalDate } from '../utils/dates'
 import { businessTimeZone } from '../businessDate'
 
 export default function DashboardPage() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const onNav = page => navigate(`/${page}`)
   const { data: inv }       = useData(invApi.getAll)
@@ -35,6 +38,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {user.role === 'OWNER' && ponds && fishes && (!ponds.length || !fishes.length) && <FarmGettingStarted />}
       <div className="stats-grid">
         <div className="stat-card stat-green" data-icon="📦">
           <div className="stat-lbl">Total Stock</div>

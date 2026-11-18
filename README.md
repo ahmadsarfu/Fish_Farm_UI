@@ -115,3 +115,19 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 ```
 
 Backend security, tenancy and costing integration tests live in the backend repo.
+
+### Customer sales and Super Admin
+
+`/admin/login` is the separate platform login (password + authenticator code).
+`/admin/customers` manages customer invitations and per-farm trials, expiry and
+limits. `/admin/activity` shows platform changes. Customers use `/activate#token=...`
+to set their own password, then `/login` with mobile/email or a legacy username.
+Password reset uses the same activation screen with a short-lived reset link.
+Contact the provider for a reset; automatic email/SMS delivery is not configured.
+
+The forms and link view live in `components/platform`, platform pages in
+`pages/platform`, the separate layout in `layouts/platform`, and API calls in
+`api/platformApi.js`. Frontend role guards supplement backend authorization.
+
+Upgrade the backend database and configure the first platform owner before using
+these routes: [Platform setup guide](https://github.com/ahmadsarfu/Fish_Farm/blob/master/docs/PLATFORM_SETUP.md).

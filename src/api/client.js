@@ -12,7 +12,7 @@ export async function request(path, options = {}) {
     ...options, credentials: 'include', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', ...(!['GET', 'HEAD'].includes(method) ? { 'X-XSRF-TOKEN': csrf } : {}), ...options.headers },
   })
-  if (['/api/auth/login', '/api/auth/register', '/api/auth/select-farm', '/api/auth/logout', '/api/auth/password'].includes(path)) clearSecurityToken()
+  if (['/api/auth/login', '/api/auth/register', '/api/auth/select-farm', '/api/auth/logout', '/api/auth/password', '/api/auth/activate'].includes(path)) clearSecurityToken()
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     if (response.status === 401 && !['/api/auth/login', '/api/auth/register'].includes(path)) window.dispatchEvent(new Event('farm-session-expired'))

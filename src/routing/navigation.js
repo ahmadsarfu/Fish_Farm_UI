@@ -13,7 +13,7 @@ export const navigation = [
   { id: 'account', label: 'My Account', icon: '👤', group: 'Administration' },
 ]
 
-export const homePath = role => role === 'LABOUR' ? '/daily-feed' : '/dashboard'
+export const homePath = role => role === 'SUPER_ADMIN' ? '/admin/customers' : role === 'LABOUR' ? '/daily-feed' : '/dashboard'
 export function canAccess(role, page) {
   if (!['OWNER', 'MANAGER', 'LABOUR'].includes(role)) return false
   if (role === 'LABOUR') return ['daily-feed', 'account'].includes(page)

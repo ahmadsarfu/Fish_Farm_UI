@@ -78,7 +78,7 @@ test('unauthenticated deep link returns to its page after login, then logout pro
   await mockFarm(page, null)
   await page.goto('/ponds?view=active')
   await expect(page).toHaveURL('/login')
-  await page.getByLabel('Username').fill('owner')
+  await page.getByLabel('Mobile, email or username').fill('owner')
   await page.getByLabel('Password', { exact: true }).fill('test-password')
   await page.getByRole('button', { name: 'Log in', exact: true }).click()
   await expect(page).toHaveURL('/ponds?view=active')

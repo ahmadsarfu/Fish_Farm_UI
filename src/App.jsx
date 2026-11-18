@@ -1,7 +1,13 @@
-import { lazy } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import Loader from './components/Loader'
 import AuthProvider from './auth/AuthProvider'
 import { HomeRedirect, LoginRoute, PageAccess, ProtectedLayout } from './routing/RouteGuards'
+
+const PlatformLayout = lazy(() => import('./layouts/platform/PlatformLayout'))
+const PlatformCustomersPage = lazy(() => import('./pages/platform/PlatformCustomersPage'))
+const PlatformActivityPage = lazy(() => import('./pages/platform/PlatformActivityPage'))
+const ActivateAccountPage = lazy(() => import('./pages/ActivateAccountPage'))
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const FishTypesPage = lazy(() => import('./pages/FishTypesPage'))
@@ -18,8 +24,18 @@ const AccountPage = lazy(() => import('./pages/AccountPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
-  return <BrowserRouter><AuthProvider><Routes>
+  return <BrowserRouter><AuthProvider><Suspense fallback={<Loader />}><Routes>
+    <Route path="activate" element={<ActivateAccountPage />} />
+    <Route path="admin/login" element={<LoginRoute admin />} />
+    <Route path="admin" element={<PlatformLayout />}>
+      <Route index element={<Navigate to="customers" replace />} />
+      <Route path="customers" element={<PlatformCustomersPage />} />
+      <Route path="activity" element={<PlatformActivityPage />} />
+      <Route path="account" element={<AccountPage />} />
+      <Route path="*" element={<Navigate to="/admin/customers" replace />} />
+    </Route>
     <Route path="login" element={<LoginRoute />} />
+    <Route path="setup-existing" element={<LoginRoute legacySetup />} />
     <Route element={<ProtectedLayout />}>
       <Route index element={<HomeRedirect />} />
       <Route path="dashboard" element={<PageAccess page="dashboard"><DashboardPage /></PageAccess>} />
@@ -36,5 +52,5 @@ export default function App() {
       <Route path="account" element={<PageAccess page="account"><AccountPage /></PageAccess>} />
       <Route path="*" element={<NotFoundPage />} />
     </Route>
-  </Routes></AuthProvider></BrowserRouter>
+  </Routes></Suspense></AuthProvider></BrowserRouter>
 }
