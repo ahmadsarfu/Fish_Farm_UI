@@ -60,6 +60,11 @@ authorization remains mandatory. Changing farms remounts the page and clears
 previous drafts; a new farm's role is checked again. Customer dispatch shortcuts
 use `/dispatches?customerId=...`, preserving preselection through refresh.
 
+If a pull changes `package-lock.json`, stop preview, run `npm ci`, rebuild, and
+restart preview. A successful build alone cannot detect every browser runtime
+problem. React and React DOM are pinned to the same version, and Vite deduplicates
+both so nested dependency installations cannot introduce a second hooks runtime.
+
 Pages load in separate JavaScript chunks. Add future page modules under `pages`,
 their API calls under `api`, an explicit route in `App.jsx`, and the navigation and
 role policy in `routing/navigation.js`. All requests go through `api/client.js`

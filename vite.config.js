@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // React and its renderer must share a single hooks dispatcher, including
+  // when a dependency has its own nested React installation.
+  resolve: { dedupe: ['react', 'react-dom'] },
   plugins: [
     react(),
     VitePWA({

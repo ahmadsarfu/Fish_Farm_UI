@@ -200,3 +200,16 @@ test('daily checklist saves its tick through the shared API client and feed reco
   await expect(page.getByText('Starter', { exact: true })).toBeVisible()
   expect(api.calls.some(call => call.path === '/api/daily-feeds')).toBe(true)
 })
+
+
+test('startup with a trailing slash keeps the route, query and active navigation', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await mockFarm(page)
+  await page.goto('/ponds/?view=active#details')
+  await expect(page).toHaveURL('/ponds?view=active#details')
+  await expect(page.locator('.page-title')).toContainText('Ponds')
+  await expect(page.locator('.topbar-page-name')).toContainText('Ponds')
+  await expect(page.locator('a[href="/ponds"]')).toHaveAttribute('aria-current', 'page')
+  expect(errors).toEqual([])
+})

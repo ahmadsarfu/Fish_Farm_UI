@@ -9,6 +9,8 @@ export function ProtectedLayout() {
   const { user, loading } = useAuth()
   const location = useLocation()
   if (loading) return <Loader />
+  const pathname = location.pathname.replace(/\/+$/, '') || '/'
+  if (pathname !== location.pathname) return <Navigate to={{ pathname, search: location.search, hash: location.hash }} replace />
   if (!user) return <Navigate to="/login" state={{ from: location.pathname + location.search + location.hash }} replace />
   // A new farm must never retain another farm's page data or drafts.
   return <FarmLayout key={`${user.id}-${user.farmId}`} />
