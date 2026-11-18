@@ -118,3 +118,27 @@ test('a password reset link uses clear recovery wording and does not promise a n
   await page.getByRole('button', { name: 'Save new password', exact: true }).click()
   await expect(page).toHaveURL('/dashboard')
 })
+
+test('farm registration collects mobile and email and preserves a duplicate-contact error', async ({ page }) => {
+  let submitted
+  const headers = { 'Access-Control-Allow-Origin': 'http://127.0.0.1:4175', 'Access-Control-Allow-Credentials': 'true' }
+  await fixtures(page, null)
+  await page.route('**/api/auth/setup-status', route => route.fulfill({ headers, json: { publicRegistrationEnabled: true, legacyClaimAvailable: false, legacyDataWaiting: false } }))
+  await page.route('**/api/auth/register', async route => {
+    submitted = route.request().postDataJSON()
+    await route.fulfill({ headers, status: 409, json: { message: 'This mobile or email is already in use.' } })
+  })
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Create a farm account', exact: true }).click()
+  await expect(page.getByLabel('Mobile number')).toHaveAttribute('required', '')
+  await page.getByLabel('Your name', { exact: true }).fill('Farm Owner')
+  await page.getByLabel('Farm name', { exact: true }).fill('My New Farm')
+  await page.getByLabel('Mobile number').fill('9876543210')
+  await page.getByLabel('Email (optional)').fill('owner@example.test')
+  await page.getByLabel('Username', { exact: true }).fill('farm-owner')
+  await page.getByLabel('Password', { exact: true }).fill('Registration-password-123')
+  await page.getByRole('button', { name: 'Create owner account', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('already in use')
+  expect(submitted).toMatchObject({ mobile: '9876543210', email: 'owner@example.test', username: 'farm-owner' })
+  await expect(page.getByLabel('Mobile number')).toHaveValue('9876543210')
+})

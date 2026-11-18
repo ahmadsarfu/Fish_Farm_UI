@@ -5,7 +5,7 @@ import { useAuth } from './context'
 export default function LoginPage({ admin = false, legacySetup = false }) {
   const { setUser } = useAuth()
   const [mode, setMode] = useState(legacySetup ? 'register' : 'login')
-  const [form, setForm] = useState({ username: '', password: '', displayName: '', farmName: '', claimExisting: legacySetup, setupToken: '', otp: '' })
+  const [form, setForm] = useState({ username: '', password: '', displayName: '', farmName: '', mobile: '', email: '', claimExisting: legacySetup, setupToken: '', otp: '' })
   const [legacyWaiting, setLegacyWaiting] = useState(false)
   const [claimAvailable, setClaimAvailable] = useState(false)
   const [publicRegistration, setPublicRegistration] = useState(false)
@@ -27,7 +27,8 @@ export default function LoginPage({ admin = false, legacySetup = false }) {
       {error && <div role="alert" className="alert alert-error">{error}</div>}
       <fieldset className="auth-fields" disabled={busy}>
         {mode === 'register' && <><label className="form-group">Your name<input required maxLength={120} autoComplete="name" value={form.displayName} onChange={event => change('displayName', event.target.value)} /></label><label className="form-group">Farm name<input required maxLength={120} value={form.farmName} onChange={event => change('farmName', event.target.value)} /></label></>}
-        <label className="form-group">{admin || mode === 'register' ? 'Username' : 'Mobile, email or username'}<input required minLength={3} maxLength={254} autoComplete="username" value={form.username} onChange={event => change('username', event.target.value)} /></label>
+        {mode === 'register' && <><label className="form-group">Mobile number<input required type="tel" maxLength={30} placeholder="+91 98765 43210" autoComplete="tel" value={form.mobile} onChange={event => change('mobile', event.target.value)} /><span className="page-desc">Use your unique mobile number. Include the country code outside India.</span></label><label className="form-group">Email (optional)<input type="email" maxLength={254} autoComplete="email" value={form.email} onChange={event => change('email', event.target.value)} /></label></>}
+        <label className="form-group">{admin || mode === 'register' ? 'Username' : 'Mobile, email or username'}<input required minLength={3} maxLength={mode === 'register' ? 120 : 254} autoComplete="username" value={form.username} onChange={event => change('username', event.target.value)} /></label>
         <label className="form-group">Password<input required type="password" minLength={mode === 'register' ? 10 : 1} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={event => change('password', event.target.value)} /></label>
         {admin && <label className="form-group">Authenticator code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" value={form.otp} onChange={event => change('otp', event.target.value)} /></label>}
         {mode === 'register' && claimAvailable && <><label className="auth-check"><input type="checkbox" disabled={legacySetup} checked={form.claimExisting} onChange={event => change('claimExisting', event.target.checked)} />Use my existing farm data</label>{form.claimExisting && <label className="form-group">One-time setup code<input required type="password" autoComplete="off" value={form.setupToken} onChange={event => change('setupToken', event.target.value)} /><span className="page-desc">Use the code configured on your server. Existing records stay in this farm.</span></label>}</>}
