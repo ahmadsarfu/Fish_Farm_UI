@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { request } from '../api'
+import { authApi } from '../api/authApi'
+import { teamApi } from '../api/teamApi'
+import { pondApi } from '../api/pondApi'
 import { useAuth } from '../auth/context'
 
 const empty = () => ({ displayName: '', username: '', password: '', role: 'LABOUR', pondIds: [] })
@@ -18,25 +20,25 @@ export default function TeamPage() {
   const [farmName, setFarmName] = useState('')
   useEffect(() => {
     let alive = true
-    Promise.all([request('/api/team'), request('/api/ponds'), request('/api/audit')]).then(([team, list, events]) => { if (alive) { setMembers(team); setPonds(list); setAudit(events) } }).catch(failure => { if (alive) setError(failure.message) })
+    Promise.all([teamApi.getAll(), pondApi.getAll(), teamApi.getAudit()]).then(([team, list, events]) => { if (alive) { setMembers(team); setPonds(list); setAudit(events) } }).catch(failure => { if (alive) setError(failure.message) })
     return () => { alive = false }
   }, [revision])
   async function save(event) {
     event.preventDefault(); setBusy(true); setError(''); setMessage('')
     try {
-      await request(`/api/team${editing ? `/${editing}` : ''}`, { method: editing ? 'PUT' : 'POST', body: JSON.stringify(form) })
+      await teamApi.save(editing, form)
       setForm(empty()); setEditing(null); setRevision(value => value + 1); setMessage('Team access saved. Changes apply to active sessions immediately.')
     } catch (failure) { setError(failure.message) } finally { setBusy(false) }
   }
   const toggle = id => setForm(current => ({ ...current, pondIds: current.pondIds.includes(id) ? current.pondIds.filter(value => value !== id) : [...current.pondIds, id] }))
   async function changePassword(event) {
     event.preventDefault(); setBusy(true); setError('')
-    try { await request('/api/auth/password', { method: 'POST', body: JSON.stringify(password) }); setUser(null) }
+    try { await authApi.changePassword(password); setUser(null) }
     catch (failure) { setError(failure.message) } finally { setBusy(false) }
   }
   async function createFarm(event) {
     event.preventDefault(); setBusy(true); setError('')
-    try { await request('/api/auth/farms', { method: 'POST', body: JSON.stringify({ name: farmName }) }); setUser(await request('/api/auth/me')); setFarmName(''); setMessage('New farm created. Select it from the farm switcher.') }
+    try { await authApi.createFarm(farmName); setUser(await authApi.me()); setFarmName(''); setMessage('New farm created. Select it from the farm switcher.') }
     catch (failure) { setError(failure.message) } finally { setBusy(false) }
   }
   return <div className="page compact-workspace"><div className="page-hdr"><div><h1 className="page-title">Team & Farm Settings</h1><p className="page-desc">Manage this farm’s users and pond assignments.</p></div></div>

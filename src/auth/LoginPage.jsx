@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { request } from '../api'
+import { authApi } from '../api/authApi'
 import { useAuth } from './context'
 
 export default function LoginPage() {
@@ -10,12 +10,12 @@ export default function LoginPage() {
   const [claimAvailable, setClaimAvailable] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { request('/api/auth/setup-status').then(value => { setClaimAvailable(value.legacyClaimAvailable); setLegacyWaiting(value.legacyDataWaiting) }).catch(() => {}) }, [])
+  useEffect(() => { authApi.setupStatus().then(value => { setClaimAvailable(value.legacyClaimAvailable); setLegacyWaiting(value.legacyDataWaiting) }).catch(() => {}) }, [])
   const change = (key, value) => setForm(current => ({ ...current, [key]: value }))
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError('')
     try {
-      const user = await request(`/api/auth/${mode}`, { method: 'POST', body: JSON.stringify(form) })
+      const user = await authApi[mode](form)
       setForm(current => ({ ...current, password: '', setupToken: '' })); setUser(user)
     } catch (failure) { setError(failure.message) }
     finally { setBusy(false) }

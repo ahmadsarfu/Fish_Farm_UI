@@ -1,4 +1,6 @@
-import { businessDate } from '../businessDate'
+import { feedApi } from '../../api/feedApi'
+import { pondApi } from '../../api/pondApi'
+import { businessDate } from '../../businessDate'
 import { useEffect, useState } from 'react'
 
 const today = businessDate
@@ -6,7 +8,7 @@ const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'curr
 const blankEntry = () => ({ pondId: '', feedTypeId: '', feedingDate: today(), feedingTime: 'MORNING', quantityKg: '', notes: '' })
 const blankMaster = () => ({ sizeMm: '1', name: '', ratePerKg: '', active: true })
 
-export default function FeedRecordsPage({ request, embedded = false }) {
+export default function FeedRecordsPage({ embedded = false }) {
   const [filters, setFilters] = useState(() => ({ from: `${today().slice(0, 7)}-01`, to: today(), pondId: '' }))
   const [applied, setApplied] = useState(filters)
   const [data, setData] = useState({ types: [], ponds: [], entries: [], summary: {} })
@@ -29,7 +31,7 @@ export default function FeedRecordsPage({ request, embedded = false }) {
     async function load() {
       try {
         const [types, ponds, entries, summary] = await Promise.all([
-          request('/api/feed-types'), request('/api/ponds'), request(`/api/daily-feeds?${query}`), request(`/api/daily-feeds/summary?${query}`),
+          feedApi.getTypes(), pondApi.getAll(), feedApi.getRecords(query), feedApi.getSummary(query),
         ])
         if (!ignore) { setData({ types, ponds, entries, summary }); setLoadError('') }
       } catch (failure) { if (!ignore) setLoadError(failure.message) }
@@ -37,7 +39,7 @@ export default function FeedRecordsPage({ request, embedded = false }) {
     }
     load()
     return () => { ignore = true }
-  }, [applied, revision, request])
+  }, [applied, revision])
 
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const field = (key, value) => setEntry(current => ({ ...current, [key]: value }))
@@ -48,10 +50,9 @@ export default function FeedRecordsPage({ request, embedded = false }) {
     event.preventDefault(); setSaving(true); setError(''); setMessage('')
     try {
       const id = isMaster ? masterId : editing?.id
-      const path = isMaster ? '/api/feed-types' : '/api/daily-feeds'
       const body = isMaster ? { ...master, sizeMm: Number(master.sizeMm) }
         : { ...entry, pondId: Number(entry.pondId), feedTypeId: Number(entry.feedTypeId) }
-      await request(`${path}${id ? `/${id}` : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) })
+      await (isMaster ? feedApi.saveType(id, body) : feedApi.saveRecord(id, body))
       if (isMaster) { setMaster(blankMaster()); setMasterId(null) }
       else { setEntry(blankEntry()); setEditing(null) }
       setMessage(isMaster ? 'Feed master saved. Historical rates are unchanged.' : 'Feeding saved. Expense calculated automatically.')
@@ -64,7 +65,7 @@ export default function FeedRecordsPage({ request, embedded = false }) {
     if (!window.confirm(`Delete feeding for ${item.pondName} on ${item.feedingDate}? Its expense will also be removed.`)) return
     setSaving(true); setError(''); setMessage('')
     try {
-      await request(`/api/daily-feeds/${item.id}`, { method: 'DELETE' })
+      await feedApi.deleteRecord(item.id)
       if (editing?.id === item.id) { setEditing(null); setEntry(blankEntry()) }
       setMessage('Feeding and its expense removed.'); refresh()
     } catch (failure) { setError(failure.message) }

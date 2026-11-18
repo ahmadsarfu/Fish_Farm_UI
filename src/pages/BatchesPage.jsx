@@ -1,6 +1,9 @@
 import { businessDate } from '../businessDate'
 import { useEffect, useState } from 'react'
-import { request } from '../api'
+import { batchApi } from '../api/batchApi'
+import { pondApi } from '../api/pondApi'
+import { fishApi } from '../api/fishTypeApi'
+import { fishStockApi } from '../api/fishStockApi'
 
 const today = businessDate
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })
@@ -31,8 +34,8 @@ export default function BatchesPage() {
     async function load() {
       try {
         const [batches, ponds, fishes, stock, detail] = await Promise.all([
-          request('/api/batches'), request('/api/ponds'), request('/api/fish-types'), request('/api/fish-stock'),
-          selected ? request(`/api/batches/${selected}`) : Promise.resolve(null),
+          batchApi.getAll(), pondApi.getAll(), fishApi.getAll(), fishStockApi.getAll(),
+          selected ? batchApi.getById(selected) : Promise.resolve(null),
         ])
         if (alive) { setData({ batches, ponds, fishes, stock }); setDetails(detail); setError('') }
       } catch (failure) { if (alive) setError(failure.message) }
@@ -59,10 +62,10 @@ export default function BatchesPage() {
     try {
       let result
       if (modal.type === 'create') {
-        result = await request('/api/batches', { method: 'POST', body: JSON.stringify({ ...form, stockEntryId: form.stockEntryId ? Number(form.stockEntryId) : null, pondId: form.pondId ? Number(form.pondId) : null, fishTypeId: form.fishTypeId ? Number(form.fishTypeId) : null, count: Number(form.count) }) })
+        result = await batchApi.create({ ...form, stockEntryId: form.stockEntryId ? Number(form.stockEntryId) : null, pondId: form.pondId ? Number(form.pondId) : null, fishTypeId: form.fishTypeId ? Number(form.fishTypeId) : null, count: Number(form.count) })
       } else {
         const body = { ...action, count: Number(action.count), targetPondId: action.targetPondId ? Number(action.targetPondId) : null }
-        result = await request(`/api/batch-stages/${modal.stage.id}/${modal.type}`, { method: 'POST', body: JSON.stringify(body) })
+        result = await batchApi.recordOperation(modal.stage.id, modal.type, body)
       }
       setDetails(result); setSelected(result.id); setModal(null); setMessage('Saved. Fish counts and batch costs have been updated.'); reload()
     } catch (failure) { setError(failure.message) }

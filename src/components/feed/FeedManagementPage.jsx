@@ -1,4 +1,5 @@
-import { businessDate } from '../businessDate'
+import { feedApi } from '../../api/feedApi'
+import { businessDate } from '../../businessDate'
 import { useEffect, useState } from 'react'
 import FeedRecordsPage from './FeedRecordsPage'
 
@@ -6,7 +7,7 @@ const today = businessDate
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })
 const kg = value => Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })
 
-export default function FeedManagementPage({ request, role = 'OWNER' }) {
+export default function FeedManagementPage({ role = 'OWNER' }) {
   const [date, setDate] = useState(today)
   const [tab, setTab] = useState('checklist')
   const [dashboard, setDashboard] = useState(null)
@@ -24,7 +25,7 @@ export default function FeedManagementPage({ request, role = 'OWNER' }) {
     async function load() {
       try {
         const [result, masters] = await Promise.all([
-          request(`/api/feeding-dashboard?date=${date}`), request('/api/feed-types'),
+          feedApi.getDashboard(date), feedApi.getTypes(),
         ])
         if (!ignore) { setDashboard(result); setTypes(masters); setError('') }
       } catch (failure) { if (!ignore) setError(failure.message) }
@@ -32,7 +33,7 @@ export default function FeedManagementPage({ request, role = 'OWNER' }) {
     }
     load()
     return () => { ignore = true }
-  }, [date, revision, request, tab])
+  }, [date, revision, tab])
 
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const switchTab = value => { if (value === tab) return; setTab(value); setError(''); setMessage(''); if (value !== 'records') setLoading(true) }
@@ -46,9 +47,7 @@ export default function FeedManagementPage({ request, role = 'OWNER' }) {
     if (slot.completed && !window.confirm(`Undo ${label} feeding for ${row.pondName} on ${date}? This removes all saved feed entries and ${money(slot.expense)} expense for this slot.`)) return
     setBusy(`${row.pondId}-${time}`); setError(''); setMessage('')
     try {
-      const result = await request(`/api/feeding-dashboard/${row.pondId}/slots/${time}`, {
-        method: 'PUT', body: JSON.stringify({ date, completed: !slot.completed }),
-      })
+      const result = await feedApi.setSlot(row.pondId, time, { date, completed: !slot.completed })
       setDashboard(result)
       setMessage(`${row.pondName} · ${label} ${slot.completed ? 'feeding undone' : 'feeding saved'}`)
     } catch (failure) { setError(failure.message) }
@@ -68,9 +67,7 @@ export default function FeedManagementPage({ request, role = 'OWNER' }) {
     event.preventDefault(); setBusy(`setup-${row.pondId}`); setError(''); setMessage('')
     const values = draft(row)
     try {
-      const result = await request(`/api/pond-feed-configs/${row.pondId}?date=${date}`, {
-        method: 'PUT', body: JSON.stringify({ ...values, feedTypeId: Number(values.feedTypeId) }),
-      })
+      const result = await feedApi.saveConfig(row.pondId, date, { ...values, feedTypeId: Number(values.feedTypeId) })
       setDashboard(result)
       setDrafts(current => { const next = { ...current }; delete next[row.pondId]; return next })
       setMessage(`${row.pondName} setup saved. Completed feeding quantities and costs stay unchanged.`)
@@ -100,7 +97,7 @@ export default function FeedManagementPage({ request, role = 'OWNER' }) {
     <div className="tabs feed-tabs">{(role === 'LABOUR' ? [['checklist', 'Daily Checklist']] : [['checklist', 'Daily Checklist'], ['setup', 'Pond Feed Setup'], ['records', 'Feed Master & Records']]).map(([value, label]) => <button key={value} className={`tab-btn ${tab === value ? 'active' : ''}`} disabled={!!busy} onClick={() => switchTab(value)}>{label}</button>)}</div>
     {error && <div role="alert" className="alert alert-error">{error}</div>}
     {message && <div role="status" className="alert alert-success">{message}</div>}
-    {tab === 'records' ? <FeedRecordsPage request={request} embedded /> : <>
+    {tab === 'records' ? <FeedRecordsPage embedded /> : <>
       <div className="feed-date-row"><label className="form-group">Feeding Date<input type="date" required max={today()} value={date} disabled={!!busy || role === 'LABOUR'} onChange={event => { if (event.target.value) { setDate(event.target.value); setLoading(true); setMessage('') } }} /></label><p className="page-desc">{tab === 'setup' ? 'Set quantities once. Labour only needs to tick AM / PM.' : 'Tick only after feeding is complete. Saved ticks remain after refresh.'}</p></div>
       {loading ? <div role="status" className="loading">Loading ponds…</div> : dashboard?.date === date && <>
         {tab === 'checklist' ? <>

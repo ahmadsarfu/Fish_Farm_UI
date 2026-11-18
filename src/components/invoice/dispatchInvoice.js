@@ -371,9 +371,6 @@ doc.text(
     const netWeight =
       Number(session.netWeightKg || 0)
 
-    const deduction =
-      Number(session.deductionPct || 0)
-
     const rate =
       Number(session.ratePerKg || 0)
 
@@ -382,11 +379,6 @@ doc.text(
 
     // Only for invoice display.
     // Existing backend calculation is untouched.
-
-    const grossWeight =
-      deduction > 0 && deduction < 100
-        ? netWeight / (1 - deduction / 100)
-        : netWeight
 
     const rowHeight = 17
 
@@ -452,7 +444,6 @@ doc.text(
 // )
 
     // doc.text(
-    //   `Gross ${weight(grossWeight)} kg  |  Deduction ${deduction}%  |  Net ${weight(netWeight)} kg`,
     //   col.fish,
     //   y + 12
     // )

@@ -629,3 +629,7 @@ textarea { resize: vertical; min-height: 70px; }
 .cost-breakdown > div { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--border); padding: 10px 0; }
 .cost-breakdown dt { color: var(--ink3); }
 .cost-breakdown dd { margin: 0; font-family: var(--mono); font-weight: 600; text-align: right; }
+
+/* Sidebar navigation uses real links so routes can be bookmarked and opened in a new tab. */
+a.nav-item { text-decoration: none; }
+a.nav-item:focus-visible { outline: 2px solid var(--amber, #f59e0b); outline-offset: -2px; }

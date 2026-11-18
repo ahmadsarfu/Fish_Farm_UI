@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { request, clearSecurityToken } from '../api'
+import { clearSecurityToken } from '../api/client'
+import { authApi } from '../api/authApi'
 import { setBusinessZone } from '../businessDate'
 import { AuthContext } from './context'
 
@@ -11,15 +12,15 @@ export default function AuthProvider({ children }) {
     let alive = true
     const expired = () => { clearSecurityToken(); setUser(null) }
     window.addEventListener('farm-session-expired', expired)
-    request('/api/auth/me').then(value => { if (alive) setUser(value) }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
+    authApi.me().then(value => { if (alive) setUser(value) }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false; window.removeEventListener('farm-session-expired', expired) }
   }, [setUser])
   async function logout() {
-    await request('/api/auth/logout', { method: 'POST' })
+    await authApi.logout()
     setUser(null)
   }
   async function selectFarm(id) {
-    const result = await request('/api/auth/select-farm', { method: 'POST', body: JSON.stringify({ farmId: Number(id) }) })
+    const result = await authApi.selectFarm(id)
     setUser(result)
   }
   return <AuthContext.Provider value={{ user, setUser, loading, logout, selectFarm }}>{children}</AuthContext.Provider>

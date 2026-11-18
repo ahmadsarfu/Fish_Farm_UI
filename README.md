@@ -29,6 +29,84 @@ Use the shared API client for credentials and CSRF. Do not store login credentia
 or private farm responses in browser storage. The service worker uses NetworkOnly
 for API routes and removes the previous runtime API cache.
 
-`npm run lint` reports existing issues in App.jsx, invoice generation and main.jsx.
-New auth, account, team, batch and feeding components pass targeted ESLint. Backend
-security, tenancy and costing integration tests live in the backend repository.
+The frontend is organized by responsibility:
+
+```text
+src/
+  api/                  # shared client, auth, feed, batch and module APIs
+  auth/                 # session context, provider and login/register form
+  components/           # shared Alert, Modal, Confirm, Empty and Loader
+    dispatch/           # dispatch weighing/detail workflow
+    feed/               # daily checklist, pond setup and feeding records
+    invoice/            # PDF generation
+  hooks/                # reusable data loading with stale-response protection
+  layouts/              # farm shell, sidebar and header
+  pages/                # one module per routed page
+  routing/              # navigation metadata and authentication/role guards
+  utils/                # shared date helpers
+  App.jsx               # route declarations and lazy page imports
+```
+
+Navigation uses React Router and real links. Routes can be bookmarked, opened in
+new tabs and refreshed; browser Back/Forward follows page navigation. `/` opens
+`/dashboard` for Owner/Manager and `/daily-feed` for Labour. Other routes are
+`/fish-types`, `/ponds`, `/customers`, `/harvests`, `/inventory` (Fish Stock),
+`/dispatches`, `/sales-history`, `/batches`, `/team` and `/account`. `/login`
+returns an authenticated user to the requested permitted page. Registration is
+available within the login form. Unknown paths display a recovery page.
+
+Sidebar visibility and direct-route access share the same role policy. Backend
+authorization remains mandatory. Changing farms remounts the page and clears
+previous drafts; a new farm's role is checked again. Customer dispatch shortcuts
+use `/dispatches?customerId=...`, preserving preselection through refresh.
+
+Pages load in separate JavaScript chunks. Add future page modules under `pages`,
+their API calls under `api`, an explicit route in `App.jsx`, and the navigation and
+role policy in `routing/navigation.js`. All requests go through `api/client.js`
+so session cookies and CSRF handling stay consistent.
+
+### Production routing
+
+Vite dev/preview already serves `index.html` for page routes. A production static
+host must also rewrite page URLs to `index.html`; otherwise a direct visit to
+`/ponds` will return a server 404. Keep API requests routed to the backend before
+the SPA fallback. For example, inside an Nginx server block:
+
+```nginx
+root /var/www/fishfarm-ui/dist;
+
+location /api/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+Build with `VITE_API_BASE_URL=` for this same-origin deployment. Private API
+responses must not be cached by the reverse proxy or service worker.
+
+### Verification
+
+```bash
+npm run lint
+npm run build
+npx playwright install chromium  # once, for browser tests
+npm run test:e2e
+```
+
+The browser suite starts a production preview automatically and uses mocked API
+responses, so it never writes to a real farm database. It covers direct URLs,
+refresh, history, login redirects, logout/session expiry, role restrictions,
+customer-to-dispatch navigation, switching farms and mobile navigation. To use an
+installed Chromium instead of Playwright's download:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
+```
+
+Backend security, tenancy and costing integration tests live in the backend repo.
