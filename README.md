@@ -149,3 +149,11 @@ suite uses `*.spec.js`; the Node test runner uses `tests/server.test.mjs`.
 
 Full cloud database + backend + frontend instructions:
 [Render Free Trial](https://github.com/ahmadsarfu/Fish_Farm/blob/master/docs/RENDER_FREE_TRIAL.md).
+
+### Trial request onboarding
+
+The login page links to `/request-trial`, available while public signup is disabled.
+Super Admins review pending requests at `/admin/trial-requests`, choose trial limits,
+and copy the existing activation link to share manually. No automatic email/SMS is
+sent. Apply the backend `docs/sql/trial-requests-upgrade.sql` migration before
+releasing this flow; see backend `docs/TRIAL_REQUESTS.md` for deployment and support.

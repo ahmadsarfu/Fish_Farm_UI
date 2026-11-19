@@ -4,6 +4,8 @@ import Loader from './components/Loader'
 import AuthProvider from './auth/AuthProvider'
 import { HomeRedirect, LoginRoute, PageAccess, ProtectedLayout } from './routing/RouteGuards'
 
+const TrialRequestPage = lazy(() => import('./pages/TrialRequestPage'))
+const PlatformTrialRequestsPage = lazy(() => import('./pages/platform/PlatformTrialRequestsPage'))
 const PlatformLayout = lazy(() => import('./layouts/platform/PlatformLayout'))
 const PlatformCustomersPage = lazy(() => import('./pages/platform/PlatformCustomersPage'))
 const PlatformActivityPage = lazy(() => import('./pages/platform/PlatformActivityPage'))
@@ -25,11 +27,13 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
   return <BrowserRouter><AuthProvider><Suspense fallback={<Loader />}><Routes>
+    <Route path="request-trial" element={<TrialRequestPage />} />
     <Route path="activate" element={<ActivateAccountPage />} />
     <Route path="admin/login" element={<LoginRoute admin />} />
     <Route path="admin" element={<PlatformLayout />}>
       <Route index element={<Navigate to="customers" replace />} />
       <Route path="customers" element={<PlatformCustomersPage />} />
+      <Route path="trial-requests" element={<PlatformTrialRequestsPage />} />
       <Route path="activity" element={<PlatformActivityPage />} />
       <Route path="account" element={<AccountPage />} />
       <Route path="*" element={<Navigate to="/admin/customers" replace />} />

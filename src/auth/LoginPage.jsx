@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { authApi } from '../api/authApi'
 import { useAuth } from './context'
@@ -34,6 +35,7 @@ export default function LoginPage({ admin = false, legacySetup = false }) {
         {mode === 'register' && claimAvailable && <><label className="auth-check"><input type="checkbox" disabled={legacySetup} checked={form.claimExisting} onChange={event => change('claimExisting', event.target.checked)} />Use my existing farm data</label>{form.claimExisting && <label className="form-group">One-time setup code<input required type="password" autoComplete="off" value={form.setupToken} onChange={event => change('setupToken', event.target.value)} /><span className="page-desc">Use the code configured on your server. Existing records stay in this farm.</span></label>}</>}
         <button className="btn btn-primary auth-submit" type="submit">{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create owner account'}</button>
         {!admin && (publicRegistration || legacySetup) && <button className="btn btn-ghost auth-submit" type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); change('password', '') }}>{mode === 'login' ? 'Create a farm account' : 'Back to login'}</button>}
+        {!admin && mode === 'login' && <><Link className="btn btn-ghost auth-submit" to="/request-trial">New farm? Request a free trial</Link><p className="page-desc">Team member? Ask your farm owner for access.</p></>}
       </fieldset>
     </form></main>
 }
