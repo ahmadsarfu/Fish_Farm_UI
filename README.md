@@ -131,3 +131,21 @@ The forms and link view live in `components/platform`, platform pages in
 
 Upgrade the backend database and configure the first platform owner before using
 these routes: [Platform setup guide](https://github.com/ahmadsarfu/Fish_Farm/blob/master/docs/PLATFORM_SETUP.md).
+
+
+### Render trial with browser sessions
+
+Deploy this repository as a Node Web Service. Build with
+`npm ci --include=dev && VITE_API_BASE_URL= npm run build`, start with `npm start`,
+and set `API_PROXY_TARGET` to the backend HTTPS origin (without `/api`). The
+production server serves `dist` and forwards `/api` requests, session cookies and
+CSRF headers to Spring Boot. Browser requests stay on the UI origin, so separate
+Render service domains do not require third-party cookies. API responses are
+never cached. `/healthz` checks the UI server; `/api/auth/setup-status` checks the
+backend through the proxy.
+
+Use `npm run test:server` for production-serving/proxy tests. Playwright's existing
+suite uses `*.spec.js`; the Node test runner uses `tests/server.test.mjs`.
+
+Full cloud database + backend + frontend instructions:
+[Render Free Trial](https://github.com/ahmadsarfu/Fish_Farm/blob/master/docs/RENDER_FREE_TRIAL.md).
