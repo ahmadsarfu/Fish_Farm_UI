@@ -8,12 +8,19 @@ const PROBE_TIMEOUT = 210_000
 const RETRY_DELAY = 3_000
 let lastReady = 0
 let epoch = 0
+let setupStatus = null
 let pending = null
 let snapshot = { phase: 'checking', hasConnected: false, message: '' }
 const listeners = new Set()
 export const getBackendSnapshot = () => snapshot
 export const subscribeBackend = listener => { listeners.add(listener); return () => listeners.delete(listener) }
 export const backendEpoch = () => epoch
+// Login uses the same public setup payload already verified by the readiness
+// check, rather than sending a second request immediately after startup.
+export async function backendSetupStatus() {
+  await ensureBackendReady()
+  return { ...setupStatus }
+}
 export function invalidateBackend() { lastReady = 0 }
 function publish(phase, message = '') {
   snapshot = { phase, message, hasConnected: snapshot.hasConnected || phase === 'ready' }
@@ -58,6 +65,7 @@ async function probe() {
         if (response.ok) {
           // Render may return an HTML wake-up page with HTTP 200; it is not API readiness.
           if (body && (typeof body.legacyDataWaiting === 'boolean' || typeof body.publicRegistrationEnabled === 'boolean')) {
+            setupStatus = body
             lastReady = Date.now(); epoch += 1; publish('ready')
             if (wasConnected) window.dispatchEvent(new Event('farm-backend-ready'))
             return

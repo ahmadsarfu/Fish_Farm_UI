@@ -206,3 +206,15 @@ does not forward its reserved Cloudflare client-IP header to a second Cloudflare
 edge. Normal browser `Origin`, CSRF, cookies, forwarded public host and HTTPS
 metadata remain available to Spring Security. Do not change provider-owned
 `onrender.com` DNS records in response to the generic Cloudflare error page.
+
+### Startup requests in browser DevTools
+
+The public setup payload is reused from the fresh readiness check by the login
+form, avoiding a second startup `setup-status` request. Readiness still expires
+after 60 seconds and transient failures can require another safe probe.
+
+Chrome may display both the page fetch and the service worker's network fetch
+for a single logical API call. Use upstream counts rather than adding those rows.
+`GET /api/auth/me` returning 401 before login is an expected session check; protected
+endpoints retain their authentication requirements. The PWA install icons are
+provided at `/icon-192.png` and `/icon-512.png`.
