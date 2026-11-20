@@ -213,3 +213,33 @@ test('startup with a trailing slash keeps the route, query and active navigation
   await expect(page.locator('a[href="/ponds"]')).toHaveAttribute('aria-current', 'page')
   expect(errors).toEqual([])
 })
+
+test('all farm pages use compact mobile navigation and keep the active link in view', async ({ page }) => {
+  await mockFarm(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const path of ['dashboard', 'fish-types', 'ponds', 'customers', 'daily-feed', 'harvests', 'inventory', 'dispatches', 'sales-history', 'batches', 'team', 'account']) {
+    await page.goto(`/${path}`)
+    await expect(page.locator('.page-title')).toBeVisible()
+    await expect.poll(() => page.locator('.sidebar').evaluate(node => node.getBoundingClientRect().height)).toBeLessThan(150)
+    const heading = await page.locator('.page-title').boundingBox()
+    expect(heading.y).toBeLessThan(400)
+    const active = page.locator('.sidebar-nav [aria-current="page"]')
+    await expect(active).toHaveAttribute('href', `/${path}`)
+    const item = await active.boundingBox()
+    const nav = await page.locator('.sidebar-nav').boundingBox()
+    expect(item.x).toBeGreaterThanOrEqual(nav.x - 1)
+    expect(item.x + item.width).toBeLessThanOrEqual(nav.x + nav.width + 1)
+  }
+  // Changing pages must not keep the previous page's vertical scroll position.
+  await page.evaluate(() => {
+    document.querySelector('.main').style.minHeight = '2000px'
+    window.scrollTo(0, 800)
+  })
+  await page.evaluate(() => document.querySelector('.sidebar-nav a[href="/fish-types"]').click())
+  await expect(page).toHaveURL('/fish-types')
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await expect(page.locator('.page-title')).toContainText('Fish Types')
+  await page.reload()
+  await expect(page.locator('.page-title')).toContainText('Fish Types')
+  expect((await page.locator('.sidebar').boundingBox()).height).toBeLessThan(150)
+})
