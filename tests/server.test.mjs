@@ -20,6 +20,11 @@ before(async () => {
     let body = ''
     for await (const part of req) body += part
     requests.push({ url: req.url, method: req.method, headers: req.headers, body })
+    if (req.headers['x-render-routing'] || req.headers['cdn-loop'] || req.headers['cf-ew-via']) {
+      res.writeHead(502, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ message: 'Fixture rejected stale edge routing metadata' }))
+      return
+    }
     if (req.url === '/api/auth/csrf') {
       res.setHeader('Set-Cookie', ['XSRF-TOKEN=fixture; Path=/; SameSite=Lax', 'JSESSIONID=session; Path=/; HttpOnly; SameSite=Lax'])
     }
@@ -110,4 +115,28 @@ test('repeated API checks do not accumulate timeout listeners on a keep-alive so
     assert.equal(sockets.size, 1, 'test must reuse the same client socket')
     assert.equal(socket.listenerCount('timeout'), baseline)
   } finally { agent.destroy(); await close(server) }
+})
+
+
+test('a request crossing two hosting edges drops the previous hop routing headers', async () => {
+  const headers = {
+    'CDN-Loop': 'cloudflare; loops=1',
+    'CF-EW-Via': '15',
+    'CF-Ray': 'fixture-ray',
+    'CF-Worker': 'fixture-worker',
+    'X-Render-Routing': 'frontend-fixture-route',
+    'X-Render-Original-Host': 'frontend.example.test',
+    Origin: origin,
+    Cookie: 'JSESSIONID=session; XSRF-TOKEN=fixture',
+    'X-XSRF-TOKEN': 'fixture',
+  }
+  const response = await fetch(origin + '/api/auth/csrf', { headers })
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).token, 'fixture')
+  const forwarded = requests.at(-1).headers
+  for (const name of ['cdn-loop', 'cf-ew-via', 'cf-ray', 'cf-worker', 'x-render-routing', 'x-render-original-host']) assert.equal(forwarded[name], undefined, name)
+  assert.equal(forwarded.origin, origin)
+  assert.equal(forwarded.cookie, headers.Cookie)
+  assert.equal(forwarded['x-xsrf-token'], 'fixture')
+  assert.equal(forwarded.host, `127.0.0.1:${upstream.address().port}`)
 })

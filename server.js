@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import process from 'node:process'
 
 const root = dirname(fileURLToPath(import.meta.url))
+// These describe the CDN hop that reached this frontend, not a new outbound hop.
+const edgeRoutingHeaders = new Set(['cdn-loop', 'cf-ew-via', 'cf-ray', 'cf-worker'])
 
 // Keep browser requests on the UI origin. Cookies and CSRF headers are forwarded
 // to Spring Boot without exposing a second browser origin or disabling CSRF.
@@ -16,6 +18,7 @@ export function createApp({ backendUrl = process.env.API_PROXY_TARGET, distDir =
     throw new Error('API_PROXY_TARGET must be an HTTP(S) origin without credentials or an /api suffix.')
   }
   if (!existsSync(join(distDir, 'index.html'))) throw new Error('Frontend build is missing. Run npm run build first.')
+  let notedEdgeHeaders = false
   const app = express()
   app.disable('x-powered-by')
   app.get('/healthz', (_req, res) => res.set('Cache-Control', 'no-store').json({ status: 'ok' }))
@@ -30,6 +33,19 @@ export function createApp({ backendUrl = process.env.API_PROXY_TARGET, distDir =
     // client socket on every request. Bound each upstream request instead.
     proxyTimeout: 225000,
     on: {
+      proxyReq: outgoing => {
+        let removed = false
+        for (const name of outgoing.getHeaderNames()) {
+          if (edgeRoutingHeaders.has(name) || name.startsWith('x-render-')) {
+            outgoing.removeHeader(name)
+            removed = true
+          }
+        }
+        if (removed && !notedEdgeHeaders) {
+          notedEdgeHeaders = true
+          console.info('API proxy: removed previous-hop edge routing headers')
+        }
+      },
       proxyRes: upstream => {
         upstream.headers['cache-control'] = 'no-store, private'
         if (upstream.statusCode >= 500) console.warn(`API backend returned HTTP ${upstream.statusCode}`)
@@ -59,5 +75,7 @@ export function createApp({ backendUrl = process.env.API_PROXY_TARGET, distDir =
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 4174)
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid port number.')
-  createApp().listen(port, '0.0.0.0', () => console.info(`Fish Farm UI listening on port ${port}`))
+  const app = createApp()
+  console.info(`API proxy target: ${new URL(process.env.API_PROXY_TARGET).origin}`)
+  app.listen(port, '0.0.0.0', () => console.info(`Fish Farm UI listening on port ${port}`))
 }
