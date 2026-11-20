@@ -10,10 +10,12 @@ export default function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let alive = true
+    const recheck = () => { authApi.me().then(value => { if (alive) setUser(value) }).catch(() => {}) }
+    window.addEventListener('farm-backend-ready', recheck)
     const expired = () => { clearSecurityToken(); setUser(null) }
     window.addEventListener('farm-session-expired', expired)
     authApi.me().then(value => { if (alive) setUser(value) }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false; window.removeEventListener('farm-session-expired', expired) }
+    return () => { alive = false; window.removeEventListener('farm-backend-ready', recheck); window.removeEventListener('farm-session-expired', expired) }
   }, [setUser])
   async function logout() {
     await authApi.logout()

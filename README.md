@@ -157,3 +157,24 @@ Super Admins review pending requests at `/admin/trial-requests`, choose trial li
 and copy the existing activation link to share manually. No automatic email/SMS is
 sent. Apply the backend `docs/sql/trial-requests-upgrade.sql` migration before
 releasing this flow; see backend `docs/TRIAL_REQUESTS.md` for deployment and support.
+
+### Backend cold starts
+
+The browser checks `/api/auth/setup-status` before mounting the app. It accepts
+only the JSON API readiness response, not Render's HTTP-200 HTML wake-up page.
+Temporary startup/network failures use a shared probe: 15-second request timeout,
+3-second delay, and a 4-minute total wait. Offline and persistent configuration
+errors show a retry button. There is no background keep-alive polling; the service
+can still sleep under the hosting plan's rules.
+
+Returning to the visible tab or making an API request checks readiness again when
+the previous successful check is over 60 seconds old. Existing forms stay mounted
+while reconnecting, preserving drafts. The session is revalidated after reconnect;
+expired sessions return to login. Read requests may retry once after recovery.
+Login, feeding ticks, saves and other writes are never automatically replayed. If
+a write loses its response, check the saved records before repeating it.
+
+This handles backend startup after the frontend has loaded. It cannot remove the
+hosting provider's initial frontend wake-up page, fix invalid database credentials,
+or provide an always-on uptime guarantee. No backend environment or SQL migration
+is required for this change.

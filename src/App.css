@@ -653,3 +653,10 @@ a.nav-item:focus-visible { outline: 2px solid var(--amber, #f59e0b); outline-off
 }
 .farm-start { margin-bottom: 24px; }
 .farm-start-links { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Keep the same application mounted while reconnecting so form drafts survive. */
+.connection-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.connection-card { width: 100%; max-width: 520px; padding: 28px; }
+.connection-card h1 { font-size: 24px; margin: 20px 0 12px; }
+.connection-card p { line-height: 1.6; margin-bottom: 16px; }
+.connection-card .spinner { margin: 20px 0; }
