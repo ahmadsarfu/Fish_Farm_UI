@@ -20,6 +20,11 @@ before(async () => {
     let body = ''
     for await (const part of req) body += part
     requests.push({ url: req.url, method: req.method, headers: req.headers, body })
+    if (req.headers['cf-connecting-ip'] || String(req.headers['x-forwarded-for'] || '').length > 100) {
+      res.writeHead(403, { 'Content-Type': 'text/html' })
+      res.end('<html>Error 1000: DNS points to prohibited IP</html>')
+      return
+    }
     if (req.headers['x-render-routing'] || req.headers['cdn-loop'] || req.headers['cf-ew-via']) {
       res.writeHead(502, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ message: 'Fixture rejected stale edge routing metadata' }))
@@ -139,4 +144,26 @@ test('a request crossing two hosting edges drops the previous hop routing header
   assert.equal(forwarded.cookie, headers.Cookie)
   assert.equal(forwarded['x-xsrf-token'], 'fixture')
   assert.equal(forwarded.host, `127.0.0.1:${upstream.address().port}`)
+})
+
+
+test('Cloudflare error 1000 headers are removed and the client IP stays bounded', async () => {
+  const response = await fetch(origin + '/api/auth/csrf', { headers: {
+    'CF-Connecting-IP': '198.51.100.45',
+    'CF-Connecting-IPv6': '2001:db8::1',
+    'True-Client-IP': '198.51.100.45',
+    'X-Forwarded-For': Array(20).fill('203.0.113.10').join(', '),
+    'X-Forwarded-Host': 'farm.example.test',
+    'X-Forwarded-Proto': 'https',
+    Origin: origin, Cookie: 'JSESSIONID=session', 'X-XSRF-TOKEN': 'fixture',
+  } })
+  assert.equal(response.status, 200)
+  const forwarded = requests.at(-1).headers
+  for (const name of ['cf-connecting-ip', 'cf-connecting-ipv6', 'true-client-ip']) assert.equal(forwarded[name], undefined)
+  assert.equal(forwarded['x-forwarded-for'], '198.51.100.45')
+  assert.equal(forwarded['x-forwarded-host'], 'farm.example.test')
+  assert.equal(forwarded['x-forwarded-proto'], 'https')
+  assert.equal(forwarded.origin, origin)
+  assert.equal(forwarded.cookie, 'JSESSIONID=session')
+  assert.equal(forwarded['x-xsrf-token'], 'fixture')
 })

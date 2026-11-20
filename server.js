@@ -4,10 +4,11 @@ import { existsSync } from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import process from 'node:process'
+import { isIP } from 'node:net'
 
 const root = dirname(fileURLToPath(import.meta.url))
 // These describe the CDN hop that reached this frontend, not a new outbound hop.
-const edgeRoutingHeaders = new Set(['cdn-loop', 'cf-ew-via', 'cf-ray', 'cf-worker'])
+const edgeRoutingHeaders = new Set(['cdn-loop', 'cf-ew-via', 'cf-ray', 'cf-worker', 'cf-connecting-ip', 'cf-connecting-ipv6', 'true-client-ip'])
 
 // Keep browser requests on the UI origin. Cookies and CSRF headers are forwarded
 // to Spring Boot without exposing a second browser origin or disabling CSRF.
@@ -33,7 +34,14 @@ export function createApp({ backendUrl = process.env.API_PROXY_TARGET, distDir =
     // client socket on every request. Bound each upstream request instead.
     proxyTimeout: 225000,
     on: {
-      proxyReq: outgoing => {
+      proxyReq: (outgoing, req) => {
+        // Cloudflare Error 1000 explicitly rejects a forwarded CF-Connecting-IP
+        // and oversized/duplicated X-Forwarded-For. Retain one validated client
+        // address for backend rate limiting, not the preceding CDN's headers.
+        const candidates = [req.headers['cf-connecting-ip'], typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0] : null, req.socket.remoteAddress]
+        const clientIp = candidates.find(value => typeof value === 'string' && isIP(value.trim()))
+        outgoing.removeHeader('x-forwarded-for')
+        if (clientIp) outgoing.setHeader('x-forwarded-for', clientIp.trim())
         let removed = false
         for (const name of outgoing.getHeaderNames()) {
           if (edgeRoutingHeaders.has(name) || name.startsWith('x-render-')) {

@@ -189,10 +189,20 @@ bodies, cookies, tokens or credentials. These codes help diagnose a persistent 5
 retrying cannot fix a wrong target or a stopped backend that does not start.
 
 The frontend-to-backend proxy removes previous-hop CDN/Render routing metadata
-(`CDN-Loop`, `CF-EW-Via`, `CF-Ray`, `CF-Worker`, and `X-Render-*`) before issuing a
+(`CDN-Loop`, `CF-EW-Via`, `CF-Ray`, `CF-Worker`, `CF-Connecting-IP`,
+`CF-Connecting-IPv6`, `True-Client-IP`, and `X-Render-*`) before issuing a
 new outbound request through the backend's hosting edge. Browser `Origin`, session
 cookies and CSRF headers are preserved. Startup logs show the validated public
 upstream origin so an incorrect `API_PROXY_TARGET` can be diagnosed without sharing
 secret environment variables. A hosting-edge 502 still requires comparing the
 direct backend response and current backend events; local tests do not verify
 Render's live service state.
+
+Cloudflare's [Error 1000 documentation](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1000/)
+lists `CF-Connecting-IP` on a new request and oversized/duplicated
+`X-Forwarded-For` as rejection causes. The proxy therefore sends a single validated
+client IP in `X-Forwarded-For`, preferring the front hosting edge's client IP, and
+does not forward its reserved Cloudflare client-IP header to a second Cloudflare
+edge. Normal browser `Origin`, CSRF, cookies, forwarded public host and HTTPS
+metadata remain available to Spring Security. Do not change provider-owned
+`onrender.com` DNS records in response to the generic Cloudflare error page.
