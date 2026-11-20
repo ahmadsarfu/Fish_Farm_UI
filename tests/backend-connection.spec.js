@@ -121,3 +121,67 @@ test('a disconnected write is not replayed and explains the uncertain result', a
   await expect(page.getByRole('alert')).toContainText('connection was interrupted')
   expect(calls.login).toBe(1)
 })
+
+test('a mobile fetch that ignores abort cannot keep startup loading forever', async ({ page }) => {
+  await page.clock.install()
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (url, options) => String(url).includes('/api/auth/setup-status')
+      ? new Promise(() => {}) : originalFetch(url, options)
+  })
+  await page.goto('/login')
+  await expect(page.getByRole('heading', { name: 'Connecting to your farm…' })).toBeVisible()
+  await page.clock.fastForward(241_000)
+  await expect(page.getByRole('alert')).toContainText('REQUEST_TIMEOUT')
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+})
+
+test('a stalled response body is also bounded by the startup timeout', async ({ page }) => {
+  await page.clock.install()
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (url, options) => String(url).includes('/api/auth/setup-status')
+      ? Promise.resolve({ ok: true, status: 200, json: () => new Promise(() => {}) }) : originalFetch(url, options)
+  })
+  await page.goto('/login')
+  await expect(page.getByRole('heading', { name: 'Connecting to your farm…' })).toBeVisible()
+  await page.clock.fastForward(241_000)
+  await expect(page.getByRole('alert')).toContainText('REQUEST_TIMEOUT')
+})
+
+test('focus and tab visibility do not silently restart an exhausted attempt', async ({ page }) => {
+  const calls = await fixture(page, { setup: (_route, _calls, reply) => reply({}, 403) })
+  await page.goto('/login')
+  await expect(page.getByRole('alert')).toContainText('(403)')
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(page.getByRole('alert')).toContainText('(403)')
+  expect(calls.setup).toBe(1)
+})
+
+test('the initial request stays connected through a 150-second JVM cold start', async ({ page }) => {
+  await page.clock.install()
+  await fixture(page)
+  await page.addInitScript(({ body }) => {
+    window.startupAborts = 0
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = (url, options) => {
+      if (!String(url).includes('/api/auth/setup-status')) return originalFetch(url, options)
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })), 150_000)
+        options?.signal?.addEventListener('abort', () => {
+          window.startupAborts++
+          clearTimeout(timer)
+          reject(new DOMException('Aborted', 'AbortError'))
+        }, { once: true })
+      })
+    }
+  }, { body: ready })
+  await page.goto('/login')
+  await expect(page.getByRole('heading', { name: 'Connecting to your farm…' })).toBeVisible()
+  await page.clock.runFor(150_100)
+  await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => window.startupAborts)).toBe(0)
+})

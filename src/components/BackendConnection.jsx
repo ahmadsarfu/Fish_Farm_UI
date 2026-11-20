@@ -4,15 +4,18 @@ import { ensureBackendReady, getBackendSnapshot, subscribeBackend } from '../api
 export default function BackendConnection({ children }) {
   const connection = useSyncExternalStore(subscribeBackend, getBackendSnapshot)
   useEffect(() => {
-    const connect = () => { ensureBackendReady().catch(() => {}) }
+    // An exhausted attempt stays on the error screen until an explicit retry
+    // or network reconnection; returning focus must not silently restart it.
+    const connect = () => { if (getBackendSnapshot().phase !== 'error') ensureBackendReady().catch(() => {}) }
+    const online = () => { ensureBackendReady({ force: true }).catch(() => {}) }
     const visible = () => { if (document.visibilityState === 'visible') connect() }
     connect()
     window.addEventListener('focus', connect)
-    window.addEventListener('online', connect)
+    window.addEventListener('online', online)
     document.addEventListener('visibilitychange', visible)
     return () => {
       window.removeEventListener('focus', connect)
-      window.removeEventListener('online', connect)
+      window.removeEventListener('online', online)
       document.removeEventListener('visibilitychange', visible)
     }
   }, [])

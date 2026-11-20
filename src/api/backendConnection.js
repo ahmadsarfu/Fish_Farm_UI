@@ -2,7 +2,9 @@ import { API_BASE } from './config'
 
 const FRESH_FOR = 60_000
 const STARTUP_LIMIT = 240_000
-const PROBE_TIMEOUT = 15_000
+// Keep the initial request connected long enough for the measured ~150s JVM
+// startup plus host allocation. The overall attempt is still capped at 4 minutes.
+const PROBE_TIMEOUT = 210_000
 const RETRY_DELAY = 3_000
 let lastReady = 0
 let epoch = 0
@@ -31,17 +33,30 @@ async function probe() {
   const wasConnected = snapshot.hasConnected
   publish('checking')
   const deadline = Date.now() + STARTUP_LIMIT
+  let lastFailure = 'NO_RESPONSE'
   try {
     while (Date.now() < deadline) {
       if (!navigator.onLine) throw new Error('You appear to be offline. Check your connection, then try again.')
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), Math.min(PROBE_TIMEOUT, deadline - Date.now()))
+      let timeout
+      let timedOut = false
+      const expired = new Promise((_, reject) => {
+        timeout = setTimeout(() => {
+          timedOut = true
+          controller.abort()
+          reject(new Error('Readiness request timed out'))
+        }, Math.min(PROBE_TIMEOUT, deadline - Date.now()))
+      })
       let permanentError = null
       try {
-        const response = await fetch(`${API_BASE}/api/auth/setup-status`, { credentials: 'include', cache: 'no-store', signal: controller.signal })
+        // Explicitly bound both the response and body read. Some mobile/service-worker
+        // fetches may not settle promptly when their AbortSignal is cancelled.
+        const operation = fetch(`${API_BASE}/api/auth/setup-status`, { credentials: 'include', cache: 'no-store', signal: controller.signal })
+          .then(async response => ({ response, body: response.ok ? await response.json().catch(() => null) : null }))
+        const { response, body } = await Promise.race([operation, expired])
+        lastFailure = response.ok ? 'NON_API_RESPONSE' : `HTTP_${response.status}`
         if (response.ok) {
           // Render may return an HTML wake-up page with HTTP 200; it is not API readiness.
-          const body = await response.json()
           if (body && (typeof body.legacyDataWaiting === 'boolean' || typeof body.publicRegistrationEnabled === 'boolean')) {
             lastReady = Date.now(); epoch += 1; publish('ready')
             if (wasConnected) window.dispatchEvent(new Event('farm-backend-ready'))
@@ -50,13 +65,13 @@ async function probe() {
         } else if (!isTemporaryFailure(response)) {
           permanentError = new Error(`Unable to connect to the server (${response.status}). Please try again or contact support.`)
         }
-      } catch { /* Network failures, timeouts and wake-up HTML are retried within the startup limit. */ }
+      } catch { lastFailure = timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR' }
       finally { clearTimeout(timeout) }
       if (permanentError) throw permanentError
       const remaining = deadline - Date.now()
       if (remaining > 0) await pause(Math.min(RETRY_DELAY, remaining))
     }
-    throw new Error('The server is taking longer than expected. Please try again. If this continues, contact support.')
+    throw new Error(`The server is taking longer than expected. Please try again. If this continues, contact support. Reference: ${lastFailure}`)
   } catch (error) {
     lastReady = 0; publish('error', error.message); throw error
   }

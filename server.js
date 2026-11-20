@@ -26,11 +26,18 @@ export function createApp({ backendUrl = process.env.API_PROXY_TARGET, distDir =
     // Express removes the mount path; Spring Boot still needs the full /api path.
     pathRewrite: (_path, req) => req.originalUrl,
     cookieDomainRewrite: '',
-    timeout: 120000,
-    proxyTimeout: 120000,
+    // Do not set httpxy's inbound `timeout`: it adds a listener to the reused
+    // client socket on every request. Bound each upstream request instead.
+    proxyTimeout: 225000,
     on: {
-      proxyRes: upstream => { upstream.headers['cache-control'] = 'no-store, private' },
-      error: (_error, _req, res) => {
+      proxyRes: upstream => {
+        upstream.headers['cache-control'] = 'no-store, private'
+        if (upstream.statusCode >= 500) console.warn(`API backend returned HTTP ${upstream.statusCode}`)
+      },
+      error: (error, _req, res) => {
+        if (res.destroyed || res.writableEnded) return
+        const code = /^[A-Z0-9_]+$/.test(error.code || '') ? error.code : 'UPSTREAM_ERROR'
+        console.warn(`API backend connection failed: ${code}`)
         if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, private' })
         res.end(JSON.stringify({ message: 'The backend is starting or unavailable. Please wait a moment and try again.' }))
       },

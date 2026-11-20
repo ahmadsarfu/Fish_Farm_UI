@@ -1,6 +1,6 @@
 import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
+import { Agent, createServer, request as httpRequest } from 'node:http'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -86,4 +86,28 @@ test('returns a useful uncached 502 when the backend is unavailable', async () =
     assert.match((await response.json()).message, /backend is starting or unavailable/)
     assert.equal((await fetch(address + '/healthz')).status, 200)
   } finally { await close(server) }
+})
+
+
+test('repeated API checks do not accumulate timeout listeners on a keep-alive socket', async () => {
+  const server = createServer(createApp({ backendUrl: `http://127.0.0.1:${upstream.address().port}`, distDir: directory }))
+  const sockets = new Set()
+  server.on('connection', socket => sockets.add(socket))
+  const address = await listen(server)
+  const agent = new Agent({ keepAlive: true, maxSockets: 1 })
+  const get = () => new Promise((resolve, reject) => {
+    const req = httpRequest(address + '/api/auth/setup-status', { agent, headers: { Connection: 'keep-alive' } }, res => {
+      res.resume()
+      res.on('end', () => resolve(res.statusCode))
+    })
+    req.on('error', reject); req.end()
+  })
+  try {
+    assert.equal(await get(), 200)
+    const socket = [...sockets][0]
+    const baseline = socket.listenerCount('timeout')
+    for (let i = 0; i < 25; i++) assert.equal(await get(), 200)
+    assert.equal(sockets.size, 1, 'test must reuse the same client socket')
+    assert.equal(socket.listenerCount('timeout'), baseline)
+  } finally { agent.destroy(); await close(server) }
 })

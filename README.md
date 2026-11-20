@@ -162,7 +162,7 @@ releasing this flow; see backend `docs/TRIAL_REQUESTS.md` for deployment and sup
 
 The browser checks `/api/auth/setup-status` before mounting the app. It accepts
 only the JSON API readiness response, not Render's HTTP-200 HTML wake-up page.
-Temporary startup/network failures use a shared probe: 15-second request timeout,
+Temporary startup/network failures use a shared probe: 210-second readiness request timeout (to allow the measured 150-second JVM startup),
 3-second delay, and a 4-minute total wait. Offline and persistent configuration
 errors show a retry button. There is no background keep-alive polling; the service
 can still sleep under the hosting plan's rules.
@@ -178,3 +178,12 @@ This handles backend startup after the frontend has loaded. It cannot remove the
 hosting provider's initial frontend wake-up page, fix invalid database credentials,
 or provide an always-on uptime guarantee. No backend environment or SQL migration
 is required for this change.
+
+The Node proxy uses a 225-second upstream timeout and avoids the proxy library's
+inbound socket-timeout option, which accumulates listeners on reused sockets.
+Timeout handling also bounds stalled response bodies, and returning browser focus
+cannot silently restart an exhausted attempt. An exhausted readiness screen shows
+a safe reference such as `HTTP_502`, `REQUEST_TIMEOUT` or `NETWORK_ERROR`.
+Upstream HTTP 5xx statuses and connection error codes are logged without request
+bodies, cookies, tokens or credentials. These codes help diagnose a persistent 502;
+retrying cannot fix a wrong target or a stopped backend that does not start.
